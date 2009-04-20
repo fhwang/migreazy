@@ -1,0 +1,37 @@
+#!/usr/bin/env ruby
+
+if ARGV.size != 2
+  puts "migreazy diff [git branch]"
+end
+
+require 'config/boot'
+require 'config/environment'
+require 'grit'
+
+diff = ARGV.shift
+git_branch_name = ARGV.shift
+repo = Grit::Repo.new '.'
+head = repo.heads.detect { |h| h.name == git_branch_name }
+branch_migrations = (head.commit.tree / "db/migrate").contents.map { |blob|
+  blob.name.gsub(/^0*(\d+)_.*/, '\1')
+}
+db_config = YAML::load(IO.read("./config/database.yml"))
+ActiveRecord::Base.establish_connection db_config['dev']
+dev_db_migrations = ActiveRecord::Base.connection.select_all(
+  "select version from schema_migrations"
+).map { |hash| hash['version'] }
+missing_in_db = branch_migrations - dev_db_migrations
+puts "Missing in dev DB:"
+if missing_in_db.empty?
+  puts "  (none)"
+else
+  puts "  #{missing_in_db.join(', ')}"
+end
+puts
+missing_in_branch = dev_db_migrations - branch_migrations
+puts "Missing in branch #{git_branch_name}:"
+if missing_in_branch.empty?
+  puts "  (none)"
+else
+  puts "  #{missing_in_branch.join(', ')}"
+end
