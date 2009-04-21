@@ -13,36 +13,48 @@ require 'config/boot'
 require 'config/environment'
 require 'grit'
 
+module Migreazy
+  class Difference
+    attr_reader :missing_in_branch, :missing_in_db
+  
+    def initialize(git_branch_name)
+      repo = Grit::Repo.new '.'
+      head = repo.heads.detect { |h| h.name == git_branch_name }
+      all_migrations = (head.commit.tree / "db/migrate").contents
+      branch_migrations = all_migrations.map { |blob|
+        blob.name.gsub(/^0*(\d+)_.*/, '\1')
+      }
+      db_config = YAML::load(IO.read("./config/database.yml"))
+      ActiveRecord::Base.establish_connection db_config['dev']
+      dev_db_migrations = ActiveRecord::Base.connection.select_all(
+        "select version from schema_migrations"
+      ).map { |hash| hash['version'] }
+      @missing_in_db = branch_migrations - dev_db_migrations
+      @missing_in_branch = dev_db_migrations - branch_migrations
+    end
+  end
+end
+
 git_branch_name = ARGV.shift
-repo = Grit::Repo.new '.'
-head = repo.heads.detect { |h| h.name == git_branch_name }
-branch_migrations = (head.commit.tree / "db/migrate").contents.map { |blob|
-  blob.name.gsub(/^0*(\d+)_.*/, '\1')
-}
-db_config = YAML::load(IO.read("./config/database.yml"))
-ActiveRecord::Base.establish_connection db_config['dev']
-dev_db_migrations = ActiveRecord::Base.connection.select_all(
-  "select version from schema_migrations"
-).map { |hash| hash['version'] }
-missing_in_db = branch_migrations - dev_db_migrations
-missing_in_branch = dev_db_migrations - branch_migrations
 if verb == 'diff'
+  difference = Migreazy::Difference.new git_branch_name
   puts "Missing in dev DB:"
-  if missing_in_db.empty?
+  if difference.missing_in_db.empty?
     puts "  (none)"
   else
-    puts "  #{missing_in_db.join(', ')}"
+    puts "  #{difference.missing_in_db.join(', ')}"
   end
   puts
   puts "Missing in branch #{git_branch_name}:"
-  if missing_in_branch.empty?
+  if difference.missing_in_branch.empty?
     puts "  (none)"
   else
-    puts "  #{missing_in_branch.join(', ')}"
+    puts "  #{difference.missing_in_branch.join(', ')}"
   end
 elsif verb == 'down'
+  difference = Migreazy::Difference.new git_branch_name
   successful_downs = []
-  missing_in_branch.sort.reverse.each do |migration|
+  difference.missing_in_branch.sort.reverse.each do |migration|
     puts `rake db:migrate:down VERSION=#{migration}`
     successful_downs << migration
   end
