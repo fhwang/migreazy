@@ -1,7 +1,8 @@
 #!/usr/bin/env ruby
 
-if ARGV.size != 2
+if ARGV.size < 1
   puts "migreazy [diff|down] [git branch]"
+  exit
 end
 verb = ARGV.shift
 unless %w(diff down).include?(verb)
@@ -18,12 +19,20 @@ module Migreazy
     attr_reader :missing_in_branch, :missing_in_db
   
     def initialize(git_branch_name)
-      repo = Grit::Repo.new '.'
-      head = repo.heads.detect { |h| h.name == git_branch_name }
-      all_migrations = (head.commit.tree / "db/migrate").contents
-      branch_migrations = all_migrations.map { |blob|
-        blob.name.gsub(/^0*(\d+)_.*/, '\1')
-      }
+      if git_branch_name
+        repo = Grit::Repo.new '.'
+        head = repo.heads.detect { |h| h.name == git_branch_name }
+        all_migrations = (head.commit.tree / "db/migrate").contents
+        branch_migrations = all_migrations.map { |blob|
+          blob.name.gsub(/^0*(\d+)_.*/, '\1')
+        }
+      else
+        branch_migrations = Dir.entries("./db/migrate").select { |entry|
+          entry =~ /\d+.*\.rb/
+        }.map { |entry|
+          entry.gsub(/^0*(\d+)_.*/, '\1')
+        }
+      end
       db_config = YAML::load(IO.read("./config/database.yml"))
       ActiveRecord::Base.establish_connection db_config['dev']
       dev_db_migrations = ActiveRecord::Base.connection.select_all(
@@ -45,7 +54,12 @@ if verb == 'diff'
     puts "  #{difference.missing_in_db.join(', ')}"
   end
   puts
-  puts "Missing in branch #{git_branch_name}:"
+  description = if git_branch_name
+    "branch #{git_branch_name}"
+  else
+    "working copy"
+  end
+  puts "Missing in #{description}:"
   if difference.missing_in_branch.empty?
     puts "  (none)"
   else
