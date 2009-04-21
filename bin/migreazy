@@ -1,12 +1,7 @@
 #!/usr/bin/env ruby
 
 if ARGV.size < 1
-  puts "migreazy [diff|down] [git branch]"
-  exit
-end
-verb = ARGV.first
-unless %w(diff down).include?(verb)
-  puts "'#{verb}' is not a migreazy command."
+  puts "migreazy [diff|down]"
   exit
 end
 
@@ -15,8 +10,13 @@ require 'config/environment'
 require 'grit'
 
 module Migreazy
-  module Action
-    class Diff
+  class Action
+    def initialize
+      db_config = YAML::load(IO.read("./config/database.yml"))
+      ActiveRecord::Base.establish_connection db_config['dev']
+    end
+  
+    class Diff < Action
       def run
         git_branch_name = ARGV[1]
         difference = Migreazy::Difference.new git_branch_name
@@ -40,6 +40,22 @@ module Migreazy
         end
       end
     end
+    
+    class Down < Action
+      def run
+        git_branch_name = ARGV[1]
+        difference = Migreazy::Difference.new git_branch_name
+        successful_downs = []
+        difference.missing_in_branch.sort.reverse.each do |migration|
+          puts `rake db:migrate:down VERSION=#{migration}`
+          successful_downs << migration
+        end
+        sql = "delete from schema_migrations where version in (#{
+          successful_downs.join(',')
+        })"
+        ActiveRecord::Base.connection.execute sql
+      end
+    end
   end
   
   class Difference
@@ -60,8 +76,6 @@ module Migreazy
           entry.gsub(/^0*(\d+)_.*/, '\1')
         }
       end
-      db_config = YAML::load(IO.read("./config/database.yml"))
-      ActiveRecord::Base.establish_connection db_config['dev']
       dev_db_migrations = ActiveRecord::Base.connection.select_all(
         "select version from schema_migrations"
       ).map { |hash| hash['version'] }
@@ -71,18 +85,10 @@ module Migreazy
   end
 end
 
-if verb == 'diff'
-  Migreazy::Action::Diff.new.run
-elsif verb == 'down'
-  git_branch_name = ARGV[1]
-  difference = Migreazy::Difference.new git_branch_name
-  successful_downs = []
-  difference.missing_in_branch.sort.reverse.each do |migration|
-    puts `rake db:migrate:down VERSION=#{migration}`
-    successful_downs << migration
-  end
-  sql = "delete from schema_migrations where version in (#{
-    successful_downs.join(',')
-  })"
-  ActiveRecord::Base.connection.execute sql
+
+action = ARGV.first
+begin
+  Migreazy::Action.const_get(action.capitalize).new.run
+rescue NameError
+  puts "'#{action}' is not a migreazy action."
 end
