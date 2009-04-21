@@ -4,7 +4,7 @@ if ARGV.size < 1
   puts "migreazy [diff|down] [git branch]"
   exit
 end
-verb = ARGV.shift
+verb = ARGV.first
 unless %w(diff down).include?(verb)
   puts "'#{verb}' is not a migreazy command."
   exit
@@ -15,6 +15,33 @@ require 'config/environment'
 require 'grit'
 
 module Migreazy
+  module Action
+    class Diff
+      def run
+        git_branch_name = ARGV[1]
+        difference = Migreazy::Difference.new git_branch_name
+        puts "Missing in dev DB:"
+        if difference.missing_in_db.empty?
+          puts "  (none)"
+        else
+          puts "  #{difference.missing_in_db.join(', ')}"
+        end
+        puts
+        description = if git_branch_name
+          "branch #{git_branch_name}"
+        else
+          "working copy"
+        end
+        puts "Missing in #{description}:"
+        if difference.missing_in_branch.empty?
+          puts "  (none)"
+        else
+          puts "  #{difference.missing_in_branch.join(', ')}"
+        end
+      end
+    end
+  end
+  
   class Difference
     attr_reader :missing_in_branch, :missing_in_db
   
@@ -44,28 +71,10 @@ module Migreazy
   end
 end
 
-git_branch_name = ARGV.shift
 if verb == 'diff'
-  difference = Migreazy::Difference.new git_branch_name
-  puts "Missing in dev DB:"
-  if difference.missing_in_db.empty?
-    puts "  (none)"
-  else
-    puts "  #{difference.missing_in_db.join(', ')}"
-  end
-  puts
-  description = if git_branch_name
-    "branch #{git_branch_name}"
-  else
-    "working copy"
-  end
-  puts "Missing in #{description}:"
-  if difference.missing_in_branch.empty?
-    puts "  (none)"
-  else
-    puts "  #{difference.missing_in_branch.join(', ')}"
-  end
+  Migreazy::Action::Diff.new.run
 elsif verb == 'down'
+  git_branch_name = ARGV[1]
   difference = Migreazy::Difference.new git_branch_name
   successful_downs = []
   difference.missing_in_branch.sort.reverse.each do |migration|
