@@ -23,39 +23,43 @@ module Migreazy
   class Action
     def initialize(opts)
       @opts = opts
+      if opts.empty?
+        @migration_source1 = MigrationSource::Database.new
+        @migration_source2 = MigrationSource::WorkingCopy.new
+      elsif opts.size == 1
+        @migration_source1 = MigrationSource::Database.new
+        @migration_source2 = MigrationSource::GitBranch.new(opts.first)
+      end
     end
   
     class Diff < Action
       def run
-        git_branch_name = @opts.first
-        difference = Migreazy::Difference.new git_branch_name
-        puts "Missing in dev DB:"
-        if difference.missing_in_db.empty?
+        missing_in_db =
+            @migration_source2.migrations - @migration_source1.migrations
+        puts "Missing in #{@migration_source1.description}:"
+        if missing_in_db.empty?
           puts "  (none)"
         else
-          puts "  #{difference.missing_in_db.join(', ')}"
+          puts "  #{missing_in_db.join(', ')}"
         end
         puts
-        description = if git_branch_name
-          "branch #{git_branch_name}"
-        else
-          "working copy"
-        end
-        puts "Missing in #{description}:"
-        if difference.missing_in_branch.empty?
+        missing_in_branch =
+            @migration_source1.migrations - @migration_source2.migrations
+        puts "Missing in #{@migration_source2.description}:"
+        if missing_in_branch.empty?
           puts "  (none)"
         else
-          puts "  #{difference.missing_in_branch.join(', ')}"
+          puts "  #{missing_in_branch.join(', ')}"
         end
       end
     end
     
     class Down < Action
       def run
-        git_branch_name = @opts.first
-        difference = Migreazy::Difference.new git_branch_name
         successful_downs = []
-        difference.missing_in_branch.sort.reverse.each do |migration|
+        missing_in_branch =
+            @migration_source1.migrations - @migration_source2.migrations
+        missing_in_branch.sort.reverse.each do |migration|
           puts `rake db:migrate:down VERSION=#{migration}`
           successful_downs << migration
         end
@@ -68,30 +72,50 @@ module Migreazy
     end
   end
   
-  class Difference
-    attr_reader :missing_in_branch, :missing_in_db
+  class MigrationSource
+    attr_reader :migrations
   
-    def initialize(git_branch_name)
-      if git_branch_name
+    class Database < MigrationSource
+      def initialize
+        Migreazy.ensure_db_connection
+        @migrations = ActiveRecord::Base.connection.select_all(
+          "select version from schema_migrations"
+        ).map { |hash| hash['version'] }
+      end
+      
+      def description
+        "development DB"
+      end
+    end
+    
+    class GitBranch < MigrationSource
+      def initialize(git_branch_name)
+        @git_branch_name = git_branch_name
         repo = Grit::Repo.new '.'
-        head = repo.heads.detect { |h| h.name == git_branch_name }
+        head = repo.heads.detect { |h| h.name == @git_branch_name }
         all_migrations = (head.commit.tree / "db/migrate").contents
-        branch_migrations = all_migrations.map { |blob|
+        @migrations = all_migrations.map { |blob|
           blob.name.gsub(/^0*(\d+)_.*/, '\1')
         }
-      else
-        branch_migrations = Dir.entries("./db/migrate").select { |entry|
-          entry =~ /\d+.*\.rb/
+      end
+      
+      def description
+        "branch #{@git_branch_name}"
+      end
+    end
+    
+    class WorkingCopy < MigrationSource
+      def initialize
+        @migrations = Dir.entries("./db/migrate").select { |entry|
+          entry =~ /^\d+.*\.rb$/
         }.map { |entry|
           entry.gsub(/^0*(\d+)_.*/, '\1')
         }
       end
-      Migreazy.ensure_db_connection
-      dev_db_migrations = ActiveRecord::Base.connection.select_all(
-        "select version from schema_migrations"
-      ).map { |hash| hash['version'] }
-      @missing_in_db = branch_migrations - dev_db_migrations
-      @missing_in_branch = dev_db_migrations - branch_migrations
+      
+      def description
+        "working copy"
+      end
     end
   end
 end
