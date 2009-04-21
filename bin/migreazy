@@ -10,15 +10,24 @@ require 'config/environment'
 require 'grit'
 
 module Migreazy
-  class Action
-    def initialize
+  @@db_connected = false
+  
+  def self.ensure_db_connection
+    unless @@db_connected
       db_config = YAML::load(IO.read("./config/database.yml"))
-      ActiveRecord::Base.establish_connection db_config['dev']
+      ActiveRecord::Base.establish_connection db_config['development']
+      @@db_connected = true
+    end
+  end
+
+  class Action
+    def initialize(opts)
+      @opts = opts
     end
   
     class Diff < Action
       def run
-        git_branch_name = ARGV[1]
+        git_branch_name = @opts.first
         difference = Migreazy::Difference.new git_branch_name
         puts "Missing in dev DB:"
         if difference.missing_in_db.empty?
@@ -43,13 +52,14 @@ module Migreazy
     
     class Down < Action
       def run
-        git_branch_name = ARGV[1]
+        git_branch_name = @opts.first
         difference = Migreazy::Difference.new git_branch_name
         successful_downs = []
         difference.missing_in_branch.sort.reverse.each do |migration|
           puts `rake db:migrate:down VERSION=#{migration}`
           successful_downs << migration
         end
+        Migreazy.ensure_db_connection
         sql = "delete from schema_migrations where version in (#{
           successful_downs.join(',')
         })"
@@ -76,6 +86,7 @@ module Migreazy
           entry.gsub(/^0*(\d+)_.*/, '\1')
         }
       end
+      Migreazy.ensure_db_connection
       dev_db_migrations = ActiveRecord::Base.connection.select_all(
         "select version from schema_migrations"
       ).map { |hash| hash['version'] }
@@ -85,10 +96,13 @@ module Migreazy
   end
 end
 
-
 action = ARGV.first
-begin
-  Migreazy::Action.const_get(action.capitalize).new.run
+action_class = begin
+  Migreazy::Action.const_get(action.capitalize)
 rescue NameError
+end
+if action_class
+  action_class.new(ARGV[1..-1]).run
+else
   puts "'#{action}' is not a migreazy action."
 end
