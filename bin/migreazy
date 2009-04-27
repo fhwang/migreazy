@@ -77,6 +77,24 @@ module Migreazy
         end
       end
     end
+    
+    class Find < Action
+      def initialize(opts)
+        @opts = opts
+        @migration_number = opts.first
+      end
+      
+      def run
+        repo = Grit::Repo.new '.'
+        branches = repo.heads.select { |head|
+          (head.commit.tree / "db/migrate").contents.any? { |blob|
+            blob.name =~ /^0*#{@migration_number}/
+          }
+        }
+        puts "Migration #{@migration_number} found in " +
+             branches.map(&:name).join(', ')
+      end
+    end
   end
   
   class MigrationSource
