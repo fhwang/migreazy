@@ -29,6 +29,9 @@ module Migreazy
       elsif opts.size == 1
         @migration_source1 = MigrationSource::Database.new
         @migration_source2 = MigrationSource::GitBranch.new(opts.first)
+      elsif opts.size == 2
+        @migration_source1 = MigrationSource::GitBranch.new opts.first
+        @migration_source2 = MigrationSource::GitBranch.new opts.last
       end
     end
   
