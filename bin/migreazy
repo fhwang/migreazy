@@ -59,15 +59,19 @@ module Migreazy
         successful_downs = []
         missing_in_branch =
             @migration_source1.migrations - @migration_source2.migrations
-        missing_in_branch.sort.reverse.each do |migration|
-          puts `rake db:migrate:down VERSION=#{migration}`
-          successful_downs << migration
+        if missing_in_branch.empty?
+          puts "No down migrations to run"
+        else
+          missing_in_branch.sort.reverse.each do |migration|
+            puts `rake db:migrate:down VERSION=#{migration}`
+            successful_downs << migration
+          end
+          Migreazy.ensure_db_connection
+          sql = "delete from schema_migrations where version in (#{
+            successful_downs.join(',')
+          })"
+          ActiveRecord::Base.connection.execute sql
         end
-        Migreazy.ensure_db_connection
-        sql = "delete from schema_migrations where version in (#{
-          successful_downs.join(',')
-        })"
-        ActiveRecord::Base.connection.execute sql
       end
     end
   end
