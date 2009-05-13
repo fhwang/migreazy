@@ -1,1 +1,61 @@
-What would Method Man do?
+migreazy
+========
+
+"It ain't easy bein' greazy in a world full of cleanliness."
+  -- Method Man
+
+migreazy is a tool that helps manage git branches and Rails migrations. Right now it support three actions:
+
+Diff
+====
+
+Diff will compare two sets of migrations and tell you what the differences are.
+
+Show the differences between my development DB and the git branch called "my_branch":
+$ migreazy diff my_branch
+
+Show the differences between my development DB and my working copy:
+$ migreazy diff
+
+Show the differences between the git branches "master" and "my_branch":
+$ migreazy diff master my_branch
+
+Down
+====
+
+Down will apply down migrations to get your development DB to be a suitable state so you can switch branches. For example, let's say you have the branch "master" and the branch "my_branch", with the following migrations (using the old-fashioned migration numbers for purposes of illustration):
+
+  master  my_branch
+  1       1
+          2
+  3
+  
+If you're working in "my_branch", your development DB will have migrations 1 and 2, but not 3. If for some reason you have to go back to "master" to do a quick bugfix or something, you can do this:
+
+$ migreazy down master  # this rolls back migration 2
+$ git checkout master
+$ rake db:migrate       # this runs migration 3
+
+Find
+====
+
+Find takes a migration number as an argument and digs through your git branches to see which branches contain this migration.
+
+$ migreazy find 20090512132032
+
+This can come in handy if you do a ton of branching and then occasionally make the mistake of switching a branch without first migrating down from that branch's migrations.
+
+For example, let's say you're in master but you're getting test failures that you think are being caused by having your migrations out of sync. Here's how you might fix that:
+
+$ migreazy diff
+Missing in development DB:
+  (none)
+
+Missing in working copy:
+  20090512132032
+$ migreazy find 20090512132032
+Migration 20090512132032 found in my_branch
+$ git checkout my_branch
+$ migreazy down master
+
+Copyright (c) 2009 Francis Hwang, released under the MIT license.

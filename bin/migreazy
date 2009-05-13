@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 if ARGV.size < 1
-  puts "migreazy [diff|down]"
+  puts "migreazy [diff|down|find]"
   exit
 end
 
