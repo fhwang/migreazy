@@ -21,17 +21,23 @@ module Migreazy
   end
 
   class Action
-    def initialize(opts)
-      @opts = opts
-      if opts.empty?
+    def initialize(args)
+      @args = args
+      if args.empty?
         @migration_source1 = MigrationSource::Database.new
         @migration_source2 = MigrationSource::WorkingCopy.new
-      elsif opts.size == 1
+      elsif args.size == 1
         @migration_source1 = MigrationSource::Database.new
-        @migration_source2 = MigrationSource::GitBranch.new(opts.first)
-      elsif opts.size == 2
-        @migration_source1 = MigrationSource::GitBranch.new opts.first
-        @migration_source2 = MigrationSource::GitBranch.new opts.last
+        @migration_source2 = MigrationSource.new_from_command_line_arg(
+          args.first
+        )
+      elsif args.size == 2
+        @migration_source1 = MigrationSource.new_from_command_line_arg(
+          args.first
+        )
+        @migration_source2 = MigrationSource.new_from_command_line_arg(
+          args.last
+        )
       end
     end
   
@@ -79,9 +85,9 @@ module Migreazy
     end
     
     class Find < Action
-      def initialize(opts)
-        @opts = opts
-        @migration_number = opts.first
+      def initialize(args)
+        @args = args
+        @migration_number = args.first
       end
       
       def run
@@ -98,6 +104,14 @@ module Migreazy
   end
   
   class MigrationSource
+    def self.new_from_command_line_arg(arg)
+      if File.exist?(File.expand_path(arg))
+        TextFile.new arg
+      else
+        GitBranch.new arg
+      end
+    end
+    
     attr_reader :migrations
   
     class Database < MigrationSource
@@ -126,6 +140,23 @@ module Migreazy
       
       def description
         "branch #{@git_branch_name}"
+      end
+    end
+    
+    class TextFile < MigrationSource
+      def initialize(file)
+        @file = File.expand_path(file)
+        @migrations = []
+        File.read(@file).each_line do |line|
+          line.chomp!
+          if line.to_i.to_s == line
+            @migrations << line
+          end
+        end
+      end
+      
+      def description
+        "file #{@file}"
       end
     end
     
