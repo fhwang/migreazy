@@ -78,7 +78,7 @@ module Migreazy
             else
               output = `rake db:migrate:down VERSION=#{migration}`
               puts output
-              if output.to_a[-2] =~ /: reverted \(\d*\.\d*s\)/
+              if output =~ /^==  .*: reverted \(\d*\.\d*s\)/
                 successful_downs << migration
               else
                 unless past_migration_failed
@@ -87,13 +87,6 @@ module Migreazy
                 past_migration_failed = true
               end
             end
-          end
-          unless successful_downs.empty?
-            Migreazy.ensure_db_connection
-            sql = "delete from schema_migrations where version in (#{
-              successful_downs.join(',')
-            })"
-            ActiveRecord::Base.connection.execute sql
           end
         end
       end
