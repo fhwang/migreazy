@@ -62,13 +62,16 @@ module Migreazy
         if missing_in_branch.empty?
           puts "No down migrations to run"
         else
-          missing_in_branch.sort.reverse.each do |migration|
+          missing_in_branch.sort.reverse.each do |version|
             file = Dir.entries("./db/migrate/").detect { |entry|
-              entry =~ /^#{migration}.*\.rb$/
+              entry =~ /^#{version}.*\.rb$/
             }
             require "./db/migrate/#{file}"
-            file =~ /^#{migration}_([_a-z0-9]*).rb/
+            file =~ /^#{version}_([_a-z0-9]*).rb/
             $1.camelize.constantize.down
+            ActiveRecord::Base.connection.execute(
+              "delete from schema_migrations where version = '#{version}'"
+            )
           end
         end
       end
