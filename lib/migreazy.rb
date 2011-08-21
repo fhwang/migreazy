@@ -62,22 +62,13 @@ module Migreazy
         if missing_in_branch.empty?
           puts "No down migrations to run"
         else
-          past_migration_failed = false
           missing_in_branch.sort.reverse.each do |migration|
-            if past_migration_failed
-              puts "Skipping down for #{migration} due to error in a previous migration"
-            else
-              output = `rake db:migrate:down VERSION=#{migration}`
-              puts output
-              if output =~ /^==  .*: reverted \(\d*\.\d*s\)/
-                successful_downs << migration
-              else
-                unless past_migration_failed
-                  puts "Skipping down for #{migration} due to error"
-                end
-                past_migration_failed = true
-              end
-            end
+            file = Dir.entries("./db/migrate/").detect { |entry|
+              entry =~ /^#{migration}.*\.rb$/
+            }
+            require "./db/migrate/#{file}"
+            file =~ /^#{migration}_([_a-z0-9]*).rb/
+            $1.camelize.constantize.down
           end
         end
       end
