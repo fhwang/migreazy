@@ -5,6 +5,7 @@ if ARGV.size < 1
   exit
 end
 
+require 'migreazy'
 require 'config/boot'
 require 'config/environment'
 
