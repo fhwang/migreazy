@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = %q{migreazy}
-  s.version = "1.0.1"
+  s.version = "1.0.2"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Francis Hwang"]
-  s.date = %q{2011-08-20}
+  s.date = %q{2011-09-03}
   s.default_executable = %q{migreazy}
   s.description = %q{migreazy helps manage Rails migrations across git branches.}
   s.email = %q{sera@fhwang.net}
