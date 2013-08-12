@@ -4,15 +4,14 @@
 # -*- encoding: utf-8 -*-
 
 Gem::Specification.new do |s|
-  s.name = %q{migreazy}
-  s.version = "1.0.2"
+  s.name = "migreazy"
+  s.version = "2.0.0"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Francis Hwang"]
-  s.date = %q{2011-09-03}
-  s.default_executable = %q{migreazy}
-  s.description = %q{migreazy helps manage Rails migrations across git branches.}
-  s.email = %q{sera@fhwang.net}
+  s.date = "2013-08-12"
+  s.description = "migreazy helps manage Rails migrations across git branches."
+  s.email = "sera@fhwang.net"
   s.executables = ["migreazy"]
   s.extra_rdoc_files = [
     "README"
@@ -26,10 +25,10 @@ Gem::Specification.new do |s|
     "lib/migreazy.rb",
     "migreazy.gemspec"
   ]
-  s.homepage = %q{http://github.com/fhwang/migreazy}
+  s.homepage = "http://github.com/fhwang/migreazy"
   s.require_paths = ["lib"]
-  s.rubygems_version = %q{1.6.2}
-  s.summary = %q{migreazy helps manage Rails migrations across git branches.}
+  s.rubygems_version = "1.8.23"
+  s.summary = "migreazy helps manage Rails migrations across git branches."
 
   if s.respond_to? :specification_version then
     s.specification_version = 3
