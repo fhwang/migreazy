@@ -64,21 +64,13 @@ module Migreazy
     
     class Down < Action
       def run
-        successful_downs = []
         missing_in_branch = @source1.migrations - @source2.migrations
         if missing_in_branch.empty?
           puts "No down migrations to run"
         else
           missing_in_branch.sort.reverse.each do |version|
-            file = Dir.entries("./db/migrate/").detect { |entry|
-              entry =~ /^#{version}.*\.rb$/
-            }
-            require "./db/migrate/#{file}"
-            file =~ /^#{version}_([_a-z0-9]*).rb/
-            $1.camelize.constantize.down
-            ActiveRecord::Base.connection.execute(
-              "delete from schema_migrations where version = '#{version}'"
-            )
+            cmd = "rake db:migrate:down VERSION=#{version}"
+            exec cmd
           end
         end
       end
