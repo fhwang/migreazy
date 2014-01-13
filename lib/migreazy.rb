@@ -70,7 +70,9 @@ module Migreazy
         else
           missing_in_branch.sort.reverse.each do |version|
             cmd = "rake db:migrate:down VERSION=#{version}"
-            exec cmd
+            puts cmd
+            output = `#{cmd}`
+            puts output
           end
         end
       end
