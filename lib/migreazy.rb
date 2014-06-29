@@ -1,4 +1,4 @@
-require 'grit'
+require 'rugged'
 
 module Migreazy
   @@db_connected = false
@@ -9,6 +9,15 @@ module Migreazy
       ActiveRecord::Base.establish_connection db_config['development']
       @@db_connected = true
     end
+  end
+
+  def self.migration_numbers(branch_name)
+    repo = Rugged::Repository.new '.'
+    branch = repo.branches[branch_name]
+    db_oid = branch.target.tree['db'][:oid]
+    migrate_oid = repo.lookup(db_oid)['migrate'][:oid]
+    all_migrations = repo.lookup(migrate_oid).map { |e| e[:name] }
+    all_migrations.map { |name| name.gsub(/^0*(\d+)_.*/, '\1') }
   end
 
   class Action
@@ -85,14 +94,13 @@ module Migreazy
       end
       
       def run
-        repo = Grit::Repo.new '.'
-        branches = repo.heads.select { |head|
-          (head.commit.tree / "db/migrate").contents.any? { |blob|
-            blob.name =~ /^0*#{@migration_number}/
-          }
+        repo = Rugged::Repository.new '.'
+        local_branches = repo.branches.each_name(:local).sort
+        matching_branches = local_branches.select { |branch_name|
+          Migreazy.migration_numbers(branch_name).include?(@migration_number)
         }
         puts "Migration #{@migration_number} found in " +
-             branches.map(&:name).join(', ')
+             matching_branches.join(', ')
       end
     end
   end
@@ -124,12 +132,7 @@ module Migreazy
     class GitBranch < Source
       def initialize(git_branch_name)
         @git_branch_name = git_branch_name
-        repo = Grit::Repo.new '.'
-        head = repo.heads.detect { |h| h.name == @git_branch_name }
-        all_migrations = (head.commit.tree / "db/migrate").contents
-        @migrations = all_migrations.map { |blob|
-          blob.name.gsub(/^0*(\d+)_.*/, '\1')
-        }
+        @migrations = Migreazy.migration_numbers(git_branch_name)
       end
       
       def description

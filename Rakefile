@@ -7,7 +7,7 @@ begin
     gem.email = "sera@fhwang.net"
     gem.homepage = "http://github.com/fhwang/migreazy"
     gem.authors = ["Francis Hwang"]
-    gem.add_dependency 'grit'
+    gem.add_dependency 'rugged', '~> 0.21.0'
   end
   Jeweler::GemcutterTasks.new
 rescue LoadError
