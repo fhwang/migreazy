@@ -5,7 +5,7 @@ module Migreazy
   
   def self.ensure_db_connection
     unless @@db_connected
-      db_config = YAML::load(IO.read("./config/database.yml"))
+      db_config = YAML.load(ERB.new(File.read('./config/database.yml')).result)
       ActiveRecord::Base.establish_connection db_config['development']
       @@db_connected = true
     end
